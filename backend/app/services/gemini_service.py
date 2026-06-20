@@ -15,6 +15,11 @@ async def generate_insight(
     date: str,
 ) -> dict:
     """Generate a comprehensive POTS/dysautonomia-focused AI analysis using Gemini."""
+    if not settings.gemini_api_key:
+        raise ValueError(
+            "GEMINI_API_KEY is not set on the server. Add it in Render/Easypanel env vars."
+        )
+
     configure_gemini()
     model = genai.GenerativeModel(settings.gemini_model)
 

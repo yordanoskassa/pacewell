@@ -59,6 +59,7 @@ export default function Dashboard() {
   const [symptoms, setSymptoms] = useState<SymptomLog[]>([]);
   const [insight, setInsight] = useState<AIInsight | null>(null);
   const [insightLoading, setInsightLoading] = useState(false);
+  const [insightError, setInsightError] = useState<string | null>(null);
   const [syncLoading, setSyncLoading] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [initializing, setInitializing] = useState(true);
@@ -178,11 +179,22 @@ export default function Dashboard() {
 
   const handleInsight = async () => {
     setInsightLoading(true);
+    setInsightError(null);
     try {
+      if (offlineMode) {
+        setInsightError("Connect to the API for live AI analysis (offline preview mode).");
+        return;
+      }
       const result = await getAIInsight(userId, today);
       setInsight(result);
-    } catch { /* ignore */ }
-    finally { setInsightLoading(false); }
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        "AI summary failed. Check that GEMINI_API_KEY is set on the server.";
+      setInsightError(typeof msg === "string" ? msg : "AI summary failed.");
+    } finally {
+      setInsightLoading(false);
+    }
   };
 
   // Compute stats
@@ -501,6 +513,12 @@ export default function Dashboard() {
               Analyze My Day
             </button>
           </div>
+
+          {insightError && (
+            <div className="mb-4 bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-3 text-xs text-rose-300/90 leading-relaxed">
+              {insightError}
+            </div>
+          )}
 
           {insight ? (
             <div className="space-y-4 text-sm">
