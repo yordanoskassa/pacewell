@@ -1,15 +1,14 @@
-# Render Blueprint — https://render.com/docs/blueprint-spec
-# Manual deploy (no rootDir): build = pip install -r requirements.txt
-#                         start = bash start.sh
+# Render Blueprint — deploy from repo root
+# Start command MUST be: uvicorn run:app --host 0.0.0.0 --port $PORT
+# (NOT uvicorn app.main:app — app lives in backend/)
 
 services:
   - type: web
     name: pacewell-api
     runtime: python
-    rootDir: backend
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn run:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION

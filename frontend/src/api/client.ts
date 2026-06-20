@@ -4,8 +4,11 @@ import type { WearableStatus } from "../types";
 const API_BASE =
   import.meta.env.VITE_API_URL || "https://pacewell.onrender.com";
 
+const API_TIMEOUT_MS = 12_000;
+
 const api = axios.create({
   baseURL: API_BASE,
+  timeout: API_TIMEOUT_MS,
 });
 
 export function getUserId(): string {

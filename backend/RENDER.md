@@ -18,19 +18,15 @@ Save output as `FERNET_KEY`.
 2. Connect `yordanoskassa/pacewell`
 3. Fill env vars → Deploy
 
-**Option B — Manual**
+**Option B — Manual (repo root)**
 
 1. **New** → **Web Service** → connect repo
-2. Leave **Root Directory** empty (repo root is fine now)
-3. Build: `pip install -r requirements.txt`
-4. Start: `bash start.sh`
-5. Environment: `PYTHON_VERSION=3.11.9`
+2. **Root Directory:** leave empty
+3. **Build:** `pip install -r requirements.txt`
+4. **Start:** `uvicorn run:app --host 0.0.0.0 --port $PORT`
+5. **Environment:** `PYTHON_VERSION=3.11.9`
 
-**Option C — Manual with backend root**
-
-1. Root Directory: `backend`
-2. Build: `pip install -r requirements.txt`
-3. Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+Do **not** use `uvicorn app.main:app` from repo root — that causes `No module named 'app'`.
 
 ## 3. Environment variables
 

@@ -47,6 +47,7 @@ import {
   isFitbitConnectedFromUrl,
 } from "../api/client";
 import type { HRPoint, HREvent, ActivityLog, SymptomLog, AIInsight } from "../types";
+import { getOfflineDemo } from "../data/offlineDemo";
 
 export default function Dashboard() {
   const userId = getUserId();
@@ -62,8 +63,20 @@ export default function Dashboard() {
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [initMessage, setInitMessage] = useState("Loading your data…");
+  const [offlineMode, setOfflineMode] = useState(false);
 
   const today = new Date().toISOString().slice(0, 10);
+
+  const applyOfflineDemo = useCallback(() => {
+    const demo = getOfflineDemo(today);
+    setHrPoints(demo.points);
+    setBaseline(demo.baseline);
+    setEvents(demo.events);
+    setActivities(demo.activities);
+    setSymptoms(demo.symptoms);
+    setIsDemoMode(true);
+    setOfflineMode(true);
+  }, [today]);
 
   useEffect(() => {
     if (!userId) navigate("/");
@@ -139,7 +152,7 @@ export default function Dashboard() {
           setInitMessage("Loading preview data…");
           await loadDemoFallback();
         } catch {
-          /* backend offline */
+          applyOfflineDemo();
         }
       } finally {
         setInitializing(false);
@@ -147,7 +160,7 @@ export default function Dashboard() {
     }
 
     init();
-  }, [userId, today, loadData]);
+  }, [userId, today, loadData, applyOfflineDemo]);
 
   const handleSync = async () => {
     setSyncLoading(true);
@@ -223,7 +236,9 @@ export default function Dashboard() {
       {isDemoMode && (
         <div className="bg-white/5 border-b border-white/10 px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between gap-2">
           <p className="text-white/50 text-xs">
-            Connect your wearable to see your real heart rate data.
+            {offlineMode
+              ? "API waking up — showing offline preview. Sync when backend is ready."
+              : "Connect your wearable to see your real heart rate data."}
           </p>
           <a
             href={getFitbitAuthUrl(userId)}
