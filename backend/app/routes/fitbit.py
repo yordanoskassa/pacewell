@@ -11,6 +11,22 @@ from ..database import (
 router = APIRouter(prefix="/fitbit", tags=["fitbit"])
 
 
+@router.get("/status")
+async def get_wearable_status(user_id: str = Query(...)):
+    """Return wearable connection status (real Fitbit vs demo)."""
+    conn = await wearable_connections_col().find_one({"user_id": user_id})
+    if not conn:
+        return {"connected": False, "is_demo": False, "last_sync": None}
+
+    is_demo = conn.get("fitbit_user_id") == "DEMO"
+    last_sync = conn.get("last_sync")
+    return {
+        "connected": True,
+        "is_demo": is_demo,
+        "last_sync": last_sync.isoformat() if isinstance(last_sync, datetime) else last_sync,
+    }
+
+
 @router.post("/sync/today")
 async def sync_today(user_id: str = Query(...)):
     """Sync today's heart rate data from Fitbit."""

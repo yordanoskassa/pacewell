@@ -1,6 +1,7 @@
 import axios from "axios";
+import type { WearableStatus } from "../types";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -20,9 +21,20 @@ export function setUserId(id: string) {
   localStorage.setItem("pacewell_user_id", id);
 }
 
+export function isFitbitConnectedFromUrl(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("fitbit") === "connected";
+}
+
 // Auth
 export function getFitbitAuthUrl(userId: string): string {
   return `${API_BASE}/auth/fitbit/start?user_id=${encodeURIComponent(userId)}`;
+}
+
+// Wearable status
+export async function getWearableStatus(userId: string): Promise<WearableStatus> {
+  const resp = await api.get(`/fitbit/status?user_id=${userId}`);
+  return resp.data;
 }
 
 // Fitbit sync

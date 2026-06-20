@@ -47,7 +47,7 @@ export default function ClinicianReport() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white font-inter">
+    <div className="min-h-screen bg-[#0a0a0f] text-white font-inter dark-ui">
       <nav className="flex items-center justify-between px-4 sm:px-8 py-4 border-b border-white/5">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate("/dashboard")} className="text-white/40 hover:text-white transition-colors">

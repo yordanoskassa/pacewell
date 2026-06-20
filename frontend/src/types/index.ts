@@ -61,7 +61,10 @@ export interface SymptomLogCreate {
 export interface AIInsight {
   date: string;
   summary: string;
+  comprehensive_summary?: string;
   patterns: string[];
+  trigger_analysis?: string[];
+  pacing_guidance?: string[];
   recommendations: string[];
   risk_flags: string[];
   created_at: string;
@@ -77,7 +80,8 @@ export interface SyncResult {
 
 export interface WearableStatus {
   connected: boolean;
-  provider: string | null;
+  is_demo: boolean;
+  provider?: string | null;
   last_sync: string | null;
 }
 

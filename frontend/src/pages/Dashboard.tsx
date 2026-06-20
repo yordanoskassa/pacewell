@@ -43,6 +43,8 @@ import {
   deleteSymptom,
   getAIInsight,
   syncToday,
+  getWearableStatus,
+  isFitbitConnectedFromUrl,
 } from "../api/client";
 import type { HRPoint, HREvent, ActivityLog, SymptomLog, AIInsight } from "../types";
 
@@ -58,7 +60,8 @@ export default function Dashboard() {
   const [demoLoading, setDemoLoading] = useState(false);
   const [insightLoading, setInsightLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [initializing, setInitializing] = useState(true);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -76,23 +79,56 @@ export default function Dashboard() {
         getSymptoms(userId, today),
       ]);
       setHrPoints(hrData.points || []);
+      if (hrData.baseline_bpm) setBaseline(hrData.baseline_bpm);
       setEvents(hrEvents || []);
       setActivities(acts || []);
       setSymptoms(syms || []);
+      return hrData.points?.length > 0;
     } catch {
-      /* data may not exist yet */
+      return false;
     }
   }, [userId, today]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (!userId) return;
+
+    async function init() {
+      setInitializing(true);
+      try {
+        const realFitbit = isFitbitConnectedFromUrl();
+        if (realFitbit) {
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+
+        const status = await getWearableStatus(userId);
+        const hasData = await loadData();
+
+        if (realFitbit || (status.connected && !status.is_demo)) {
+          setIsDemoMode(false);
+        } else if (!hasData) {
+          const result = await seedDemoData(userId, today);
+          setBaseline(result.baseline_bpm);
+          setIsDemoMode(true);
+          await loadData();
+        } else if (status.is_demo) {
+          setIsDemoMode(true);
+        }
+      } catch {
+        /* backend may be offline */
+      } finally {
+        setInitializing(false);
+      }
+    }
+
+    init();
+  }, [userId, today, loadData]);
 
   const handleLoadDemo = async () => {
     setDemoLoading(true);
     try {
       const result = await seedDemoData(userId, today);
       setBaseline(result.baseline_bpm);
+      setIsDemoMode(true);
       await loadData();
     } catch { /* ignore */ }
     finally { setDemoLoading(false); }
@@ -103,6 +139,7 @@ export default function Dashboard() {
     try {
       const result = await syncToday(userId);
       setBaseline(result.baseline_bpm);
+      setIsDemoMode(false);
       await loadData();
     } catch { /* ignore */ }
     finally { setSyncLoading(false); }
@@ -154,25 +191,48 @@ export default function Dashboard() {
 
   if (!userId) return null;
 
+  if (initializing) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] text-white font-inter dark-ui flex items-center justify-center">
+        <Loader2 size={24} className="animate-spin text-white/30" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white font-inter">
-      {/* Top Nav */}
-      <nav className="flex items-center justify-between px-4 sm:px-8 py-4 border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <Logo className="w-6 h-6 text-white" />
-          <span className="font-askan text-lg tracking-wide">PaceWell</span>
-          <span className="text-white/30 text-sm ml-4 hidden sm:inline">Dashboard</span>
+    <div className="min-h-screen bg-[#0a0a0f] text-white font-inter dark-ui">
+      {isDemoMode && (
+        <div className="bg-violet-500/10 border-b border-violet-500/20 px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-violet-300/80 text-xs">
+            Viewing demo data — sample POTS/dysautonomia patterns. Connect Fitbit for your real heart rate.
+          </p>
+          <a
+            href={getFitbitAuthUrl(userId)}
+            className="text-xs font-medium text-violet-300 hover:text-white transition-colors"
+          >
+            Connect Fitbit →
+          </a>
         </div>
-        <div className="flex items-center gap-3">
+      )}
+      {/* Top Nav */}
+      <nav className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-8 py-4 border-b border-white/5">
+        <div className="flex items-center gap-3 min-w-0">
+          <Logo className="w-6 h-6 text-white shrink-0" />
+          <span className="font-askan text-lg tracking-wide truncate">PaceWell</span>
+          <span className="text-white/30 text-sm ml-2 hidden sm:inline">Your Day</span>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           <button
+            type="button"
             onClick={handleLoadDemo}
             disabled={demoLoading}
             className="glass text-white text-xs px-4 py-2 rounded-full hover:bg-white/10 transition-colors flex items-center gap-2"
           >
             {demoLoading ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-            Demo Data
+            Reset Demo
           </button>
           <button
+            type="button"
             onClick={handleSync}
             disabled={syncLoading}
             className="glass text-white text-xs px-4 py-2 rounded-full hover:bg-white/10 transition-colors flex items-center gap-2"
@@ -182,11 +242,11 @@ export default function Dashboard() {
           </button>
           <a
             href={getFitbitAuthUrl(userId)}
-            className="bg-white text-gray-900 text-xs font-medium px-4 py-2 rounded-full hover:bg-white/90 transition-colors hidden sm:block"
+            className="bg-white text-gray-900 text-xs font-medium px-4 py-2 rounded-full hover:bg-white/90 transition-colors"
           >
             Connect Fitbit
           </a>
-          <span className="text-white/30 text-xs">{userId}</span>
+          <span className="text-white/30 text-xs max-w-[100px] sm:max-w-none truncate">{userId}</span>
         </div>
       </nav>
 
@@ -288,8 +348,8 @@ export default function Dashboard() {
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[280px] flex items-center justify-center text-white/20 text-sm">
-              No heart rate data yet. Click "Demo Data" or "Sync Fitbit" to get started.
+            <div className="h-[280px] flex items-center justify-center text-white/20 text-sm text-center px-4">
+              Loading your heart rate data…
             </div>
           )}
         </div>
@@ -390,8 +450,81 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Activity & Symptom Loggers + AI */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        {/* Comprehensive AI Analysis */}
+        <div className="glass-card rounded-2xl p-4 sm:p-6 mb-6 border-violet-500/10">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Brain size={18} className="text-violet-400" />
+                <h2 className="text-base font-medium text-white/90">AI Analysis</h2>
+              </div>
+              <p className="text-white/40 text-xs max-w-[520px]">
+                Get a comprehensive summary connecting your heart rate spikes, triggers, symptoms, and pacing guidance.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleInsight}
+              disabled={insightLoading || !hrPoints.length}
+              className="bg-violet-500/20 border border-violet-500/30 text-violet-300 text-sm font-medium px-5 py-2.5 rounded-full hover:bg-violet-500/30 transition-colors flex items-center gap-2 disabled:opacity-30"
+            >
+              {insightLoading ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Brain size={16} />
+              )}
+              Analyze My Day
+            </button>
+          </div>
+
+          {insight ? (
+            <div className="space-y-4 text-sm">
+              {insight.comprehensive_summary && (
+                <div className="bg-violet-500/5 rounded-xl p-4 border border-violet-500/10">
+                  <span className="text-violet-400/80 font-medium text-[10px] uppercase tracking-wider">
+                    Comprehensive Summary
+                  </span>
+                  <p className="text-white/75 leading-relaxed mt-2">{insight.comprehensive_summary}</p>
+                </div>
+              )}
+              <p className="text-white/60 leading-relaxed">{insight.summary}</p>
+
+              {insight.trigger_analysis && insight.trigger_analysis.length > 0 && (
+                <InsightList title="Trigger Analysis" items={insight.trigger_analysis} color="amber" />
+              )}
+              {insight.patterns.length > 0 && (
+                <InsightList title="Patterns" items={insight.patterns} color="violet" />
+              )}
+              {insight.pacing_guidance && insight.pacing_guidance.length > 0 && (
+                <InsightList title="Pacing Guidance" items={insight.pacing_guidance} color="emerald" />
+              )}
+              {insight.recommendations.length > 0 && (
+                <InsightList title="Recommendations" items={insight.recommendations} color="blue" />
+              )}
+              {insight.risk_flags.length > 0 && (
+                <div className="bg-rose-500/10 rounded-lg p-3 border border-rose-500/20">
+                  <span className="text-rose-400 font-medium text-[10px] uppercase tracking-wider">
+                    Discuss With Your Clinician
+                  </span>
+                  <ul className="mt-2 space-y-1">
+                    {insight.risk_flags.map((r) => (
+                      <li key={r} className="text-white/60 text-xs">{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-white/20 text-xs text-center py-6 border border-dashed border-white/5 rounded-xl">
+              {hrPoints.length
+                ? 'Click "Analyze My Day" for a comprehensive AI summary of your triggers, symptoms, and pacing guidance.'
+                : "Heart rate data is loading…"}
+            </div>
+          )}
+        </div>
+
+        {/* Activity & Symptom Loggers */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Activity Logger */}
           <div className="glass-card rounded-2xl p-4 sm:p-6">
             <div className="flex items-center gap-2 mb-4">
@@ -461,86 +594,12 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-
-          {/* AI Insight */}
-          <div className="glass-card rounded-2xl p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Brain size={16} className="text-violet-400" />
-                <h2 className="text-sm font-medium text-white/80">AI Insight</h2>
-              </div>
-              <button
-                onClick={handleInsight}
-                disabled={insightLoading || !hrPoints.length}
-                className="glass text-xs text-white px-3 py-1.5 rounded-full hover:bg-white/10 transition-colors flex items-center gap-1 disabled:opacity-30"
-              >
-                {insightLoading ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <Zap size={12} />
-                )}
-                Analyze
-              </button>
-            </div>
-            {insight ? (
-              <div className="space-y-3 text-xs">
-                <p className="text-white/70 leading-relaxed">{insight.summary}</p>
-                {insight.patterns.length > 0 && (
-                  <div>
-                    <span className="text-violet-400/80 font-medium text-[10px] uppercase tracking-wider">
-                      Patterns
-                    </span>
-                    <ul className="mt-1 space-y-1">
-                      {insight.patterns.map((p, i) => (
-                        <li key={i} className="text-white/50 flex items-start gap-1.5">
-                          <ChevronRight size={10} className="mt-0.5 text-violet-400/50 shrink-0" />
-                          {p}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {insight.recommendations.length > 0 && (
-                  <div>
-                    <span className="text-emerald-400/80 font-medium text-[10px] uppercase tracking-wider">
-                      Recommendations
-                    </span>
-                    <ul className="mt-1 space-y-1">
-                      {insight.recommendations.map((r, i) => (
-                        <li key={i} className="text-white/50 flex items-start gap-1.5">
-                          <ChevronRight size={10} className="mt-0.5 text-emerald-400/50 shrink-0" />
-                          {r}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {insight.risk_flags.length > 0 && (
-                  <div className="bg-rose-500/10 rounded-lg p-2 border border-rose-500/20">
-                    <span className="text-rose-400 font-medium text-[10px] uppercase tracking-wider">
-                      Risk Flags
-                    </span>
-                    <ul className="mt-1 space-y-1">
-                      {insight.risk_flags.map((r, i) => (
-                        <li key={i} className="text-white/60">{r}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-white/20 text-xs text-center py-8">
-                {hrPoints.length
-                  ? 'Click "Analyze" to generate AI insights'
-                  : "Load data first"}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Quick Links */}
         <div className="flex gap-3">
           <button
+            type="button"
             onClick={() => navigate("/report")}
             className="glass text-white text-xs px-4 py-2.5 rounded-full hover:bg-white/10 transition-colors flex items-center gap-2"
           >
@@ -554,6 +613,44 @@ export default function Dashboard() {
 }
 
 /* ─── Sub-components ─── */
+
+function InsightList({
+  title,
+  items,
+  color,
+}: {
+  title: string;
+  items: string[];
+  color: "violet" | "emerald" | "amber" | "blue";
+}) {
+  const colors = {
+    violet: "text-violet-400/80",
+    emerald: "text-emerald-400/80",
+    amber: "text-amber-400/80",
+    blue: "text-blue-400/80",
+  };
+  const iconColors = {
+    violet: "text-violet-400/50",
+    emerald: "text-emerald-400/50",
+    amber: "text-amber-400/50",
+    blue: "text-blue-400/50",
+  };
+  return (
+    <div>
+      <span className={`${colors[color]} font-medium text-[10px] uppercase tracking-wider`}>
+        {title}
+      </span>
+      <ul className="mt-1 space-y-1">
+        {items.map((item) => (
+          <li key={item} className="text-white/50 text-xs flex items-start gap-1.5">
+            <ChevronRight size={10} className={`mt-0.5 ${iconColors[color]} shrink-0`} />
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function StatCard({
   icon,
@@ -601,7 +698,7 @@ function ActivityForm({ userId, onCreated }: { userId: string; onCreated: () => 
         onChange={(e) => setType(e.target.value)}
         className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none flex-1 min-w-[80px]"
       >
-        {["walking", "running", "climbing stairs", "cycling", "stretching", "other"].map((t) => (
+        {["standing", "showering", "walking", "climbing stairs", "sitting", "exercising", "other"].map((t) => (
           <option key={t} value={t} className="bg-gray-900">{t}</option>
         ))}
       </select>
@@ -621,6 +718,7 @@ function ActivityForm({ userId, onCreated }: { userId: string; onCreated: () => 
         className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none flex-1 min-w-[140px]"
       />
       <button
+        type="button"
         onClick={handleSubmit}
         className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg px-3 py-1.5 text-xs hover:bg-emerald-500/30 transition-colors"
       >
@@ -653,7 +751,7 @@ function SymptomForm({ userId, onCreated }: { userId: string; onCreated: () => v
         onChange={(e) => setType(e.target.value)}
         className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none flex-1 min-w-[80px]"
       >
-        {["dizziness", "chest pain", "shortness of breath", "palpitations", "fatigue", "nausea", "headache"].map((t) => (
+        {["dizziness", "brain fog", "fatigue", "palpitations", "shortness of breath", "nausea", "post-exertional malaise", "chest pain"].map((t) => (
           <option key={t} value={t} className="bg-gray-900">{t}</option>
         ))}
       </select>
@@ -672,6 +770,7 @@ function SymptomForm({ userId, onCreated }: { userId: string; onCreated: () => v
         className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none flex-1 min-w-[140px]"
       />
       <button
+        type="button"
         onClick={handleSubmit}
         className="bg-orange-500/20 border border-orange-500/30 text-orange-400 rounded-lg px-3 py-1.5 text-xs hover:bg-orange-500/30 transition-colors"
       >

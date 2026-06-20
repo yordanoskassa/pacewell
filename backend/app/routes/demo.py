@@ -40,33 +40,27 @@ def _generate_realistic_hr(date: str) -> list[dict]:
         # Simulate activities
         bpm = resting_hr + circadian
 
-        # Morning walk (7:30-8:00)
-        if 7.5 <= hour < 8.0:
-            bpm += 30 + random.randint(-5, 10)
+        # Standing / shower orthostatic spike (8:30-8:45)
+        if 8.5 <= hour < 8.75:
+            elapsed = (hour - 8.5) / 0.25
+            bpm += int(35 * math.sin(elapsed * math.pi))
 
-        # Stair climbing spike (10:15-10:25)
-        if 10.25 <= hour < 10.42:
-            elapsed = (hour - 10.25) / 0.17
-            bpm += int(45 * math.sin(elapsed * math.pi))
+        # Prolonged standing (11:00-11:20) — common POTS trigger
+        if 11.0 <= hour < 11.33:
+            bpm += 25 + random.randint(0, 12)
 
         # Lunch walk (12:30-13:00)
         if 12.5 <= hour < 13.0:
-            bpm += 25 + random.randint(-3, 8)
+            bpm += 20 + random.randint(-3, 8)
 
-        # Afternoon stress/anxiety episode (15:00-15:20)
-        if 15.0 <= hour < 15.33:
-            bpm += 20 + random.randint(0, 15)
+        # Post-exertional spike after light activity (14:30-15:00)
+        if 14.5 <= hour < 15.0:
+            bpm += 30 + random.randint(0, 15)
 
-        # Evening exercise (18:00-18:45)
-        if 18.0 <= hour < 18.75:
-            elapsed = (hour - 18.0) / 0.75
-            # Ramp up, sustain, cool down
-            if elapsed < 0.2:
-                bpm += int(50 * elapsed / 0.2)
-            elif elapsed < 0.8:
-                bpm += 50 + random.randint(-5, 15)
-            else:
-                bpm += int(50 * (1 - elapsed) / 0.2)
+        # Evening shower spike (19:00-19:15)
+        if 19.0 <= hour < 19.25:
+            elapsed = (hour - 19.0) / 0.25
+            bpm += int(40 * math.sin(elapsed * math.pi))
 
         # Add noise
         bpm += random.randint(-3, 3)
@@ -173,24 +167,33 @@ async def seed_demo_data(
     if events_to_store:
         await hr_events_col().insert_many(events_to_store)
 
-    # 5. Seed activities matching the HR patterns
+    # 5. Seed POTS-relevant activities
     activities = [
         {
             "user_id": user_id,
-            "activity_type": "walking",
-            "started_at": base_dt.replace(hour=7, minute=30),
-            "ended_at": base_dt.replace(hour=8, minute=0),
-            "intensity": "moderate",
-            "notes": "Morning walk around the neighborhood",
+            "activity_type": "standing",
+            "started_at": base_dt.replace(hour=8, minute=30),
+            "ended_at": base_dt.replace(hour=8, minute=45),
+            "intensity": "light",
+            "notes": "Morning routine — standing at sink",
             "created_at": datetime.utcnow(),
         },
         {
             "user_id": user_id,
-            "activity_type": "climbing stairs",
-            "started_at": base_dt.replace(hour=10, minute=15),
-            "ended_at": base_dt.replace(hour=10, minute=25),
-            "intensity": "vigorous",
-            "notes": "Office stairs, 4 floors",
+            "activity_type": "showering",
+            "started_at": base_dt.replace(hour=8, minute=35),
+            "ended_at": base_dt.replace(hour=8, minute=50),
+            "intensity": "moderate",
+            "notes": "Hot shower — common orthostatic trigger",
+            "created_at": datetime.utcnow(),
+        },
+        {
+            "user_id": user_id,
+            "activity_type": "standing",
+            "started_at": base_dt.replace(hour=11, minute=0),
+            "ended_at": base_dt.replace(hour=11, minute=20),
+            "intensity": "light",
+            "notes": "Prolonged standing while cooking",
             "created_at": datetime.utcnow(),
         },
         {
@@ -199,16 +202,25 @@ async def seed_demo_data(
             "started_at": base_dt.replace(hour=12, minute=30),
             "ended_at": base_dt.replace(hour=13, minute=0),
             "intensity": "light",
-            "notes": "Lunch break walk",
+            "notes": "Short lunch walk",
             "created_at": datetime.utcnow(),
         },
         {
             "user_id": user_id,
-            "activity_type": "running",
-            "started_at": base_dt.replace(hour=18, minute=0),
-            "ended_at": base_dt.replace(hour=18, minute=45),
-            "intensity": "vigorous",
-            "notes": "Evening jog",
+            "activity_type": "climbing stairs",
+            "started_at": base_dt.replace(hour=14, minute=30),
+            "ended_at": base_dt.replace(hour=14, minute=40),
+            "intensity": "moderate",
+            "notes": "One flight of stairs",
+            "created_at": datetime.utcnow(),
+        },
+        {
+            "user_id": user_id,
+            "activity_type": "showering",
+            "started_at": base_dt.replace(hour=19, minute=0),
+            "ended_at": base_dt.replace(hour=19, minute=15),
+            "intensity": "moderate",
+            "notes": "Evening shower",
             "created_at": datetime.utcnow(),
         },
     ]
@@ -216,24 +228,42 @@ async def seed_demo_data(
     await activity_logs_col().delete_many({"user_id": user_id, "started_at": {"$gte": base_dt, "$lt": base_dt + timedelta(days=1)}})
     await activity_logs_col().insert_many(activities)
 
-    # 6. Seed symptoms
+    # 6. Seed POTS-relevant symptoms
     symptoms = [
         {
             "user_id": user_id,
-            "symptom_type": "shortness of breath",
-            "severity": 4,
-            "occurred_at": base_dt.replace(hour=10, minute=20),
-            "duration_minutes": 5,
-            "notes": "After climbing stairs",
+            "symptom_type": "dizziness",
+            "severity": 6,
+            "occurred_at": base_dt.replace(hour=8, minute=42),
+            "duration_minutes": 10,
+            "notes": "After standing during morning routine",
+            "created_at": datetime.utcnow(),
+        },
+        {
+            "user_id": user_id,
+            "symptom_type": "brain fog",
+            "severity": 5,
+            "occurred_at": base_dt.replace(hour=11, minute=15),
+            "duration_minutes": 30,
+            "notes": "While standing to cook",
+            "created_at": datetime.utcnow(),
+        },
+        {
+            "user_id": user_id,
+            "symptom_type": "fatigue",
+            "severity": 7,
+            "occurred_at": base_dt.replace(hour=14, minute=50),
+            "duration_minutes": 90,
+            "notes": "Post-exertional malaise after stairs",
             "created_at": datetime.utcnow(),
         },
         {
             "user_id": user_id,
             "symptom_type": "palpitations",
-            "severity": 6,
-            "occurred_at": base_dt.replace(hour=15, minute=5),
+            "severity": 5,
+            "occurred_at": base_dt.replace(hour=19, minute=10),
             "duration_minutes": 15,
-            "notes": "During stressful meeting",
+            "notes": "During evening shower",
             "created_at": datetime.utcnow(),
         },
     ]
