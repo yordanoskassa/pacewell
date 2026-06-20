@@ -494,20 +494,31 @@ curl -X POST http://localhost:8000/waitlist \
 2. Set `VITE_API_URL=https://your-api.onrender.com`
 3. Deploy
 
+### Backend — Easypanel (Docker)
+
+Deploy **two App services** (API + frontend) from the repo Dockerfiles. Full guide: [`EASYPANEL.md`](EASYPANEL.md)
+
+| Service | Dockerfile | Proxy port |
+|---------|------------|------------|
+| `api` | `Dockerfile` (root) | `8000` |
+| `web` | `frontend/Dockerfile` | `80` |
+
+Build arg for frontend: `VITE_API_URL=https://your-api-domain`
+
+Local: `docker compose up --build`
+
 ### Backend — Render
 
 Use the included [`render.yaml`](render.yaml) blueprint **or** create a manual Web Service:
 
 | Setting | Value |
 |---------|-------|
-| **Root Directory** | `backend` |
+| **Root Directory** | empty (repo root) |
 | **Build Command** | `pip install -r requirements.txt` |
-| **Start Command** | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| **Start Command** | `uvicorn run:app --host 0.0.0.0 --port $PORT` |
 | **Python Version** | `3.11.9` |
 
 See [`backend/RENDER.md`](backend/RENDER.md) for step-by-step Render setup.
-
-> **Important:** Set Root Directory to `backend`. Building from repo root causes `requirements.txt not found`.
 
 ### Google OAuth
 

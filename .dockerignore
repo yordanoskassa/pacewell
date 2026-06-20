@@ -1,0 +1,36 @@
+# Git / local dev artifacts
+.git
+.gitignore
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+
+# Node
+**/node_modules
+frontend/dist
+frontend/.env
+frontend/.env.local
+
+# Secrets & IDE
+**/.env
+!**/.env.example
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Docs / slides (not needed in images)
+slides/
+*.md
+!backend/requirements.txt
+
+# Frontend source maps optional
+**/*.tsbuildinfo
+
+# Netlify / Render only
+netlify.toml
+render.yaml
+Procfile
