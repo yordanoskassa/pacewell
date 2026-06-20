@@ -1,10 +1,14 @@
 import axios from "axios";
 import type { WearableStatus } from "../types";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE =
+  "https://aa52-2607-fb90-9f9a-8ddd-9cce-5dba-f061-52e5.ngrok-free.app";
 
 const api = axios.create({
   baseURL: API_BASE,
+  headers: {
+    "ngrok-skip-browser-warning": "true",
+  },
 });
 
 export function getUserId(): string {

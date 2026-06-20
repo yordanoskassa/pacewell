@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/auth/fitbit/callback"
     fernet_key: str = ""
-    gemini_api_key: str = ""
+    gemini_api_key: str = "AIzaSyBXx8tmx_Nq9wjqwo9076I_Kc-TOaUTP4U"
     gemini_model: str = "gemini-2.5-flash"
     frontend_url: str = "http://localhost:5173"
 

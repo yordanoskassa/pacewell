@@ -54,7 +54,8 @@ export default function Landing() {
   const navigate = useNavigate();
 
   const handleGetStarted = () => {
-    const id = userId.trim() || "demo";
+    const id = userId.trim();
+    if (!id) return;
     setUserId(id);
     navigate("/dashboard");
   };
@@ -109,9 +110,10 @@ export default function Landing() {
             <button
               type="button"
               onClick={handleGetStarted}
-              className="hidden sm:block bg-white text-gray-900 font-medium text-sm px-6 py-3 rounded-full hover:bg-white/90 transition-colors shrink-0"
+              disabled={!userId.trim()}
+              className="hidden sm:block bg-white text-gray-900 font-medium text-sm px-6 py-3 rounded-full hover:bg-white/90 transition-colors shrink-0 disabled:opacity-40"
             >
-              Try Demo
+              Get Started
             </button>
           </nav>
 
@@ -130,9 +132,10 @@ export default function Landing() {
                 <button
                   type="button"
                   onClick={handleGetStarted}
-                  className="bg-white text-gray-900 font-medium text-sm px-6 py-3 rounded-full w-full mt-2"
+                  disabled={!userId.trim()}
+                  className="bg-white text-gray-900 font-medium text-sm px-6 py-3 rounded-full w-full mt-2 disabled:opacity-40"
                 >
-                  Try Demo
+                  Get Started
                 </button>
               </div>
             </div>
@@ -159,7 +162,7 @@ export default function Landing() {
                 <div className="glass rounded-full flex items-center relative">
                   <input
                     type="text"
-                    placeholder="Enter a name to try the demo"
+                    placeholder="Your name"
                     value={userId}
                     onChange={(e) => setUserIdInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleGetStarted()}
@@ -168,14 +171,12 @@ export default function Landing() {
                   <button
                     type="button"
                     onClick={handleGetStarted}
-                    className="absolute right-1.5 bg-white text-gray-900 text-xs sm:text-sm font-medium px-3 sm:px-6 py-2 sm:py-3 rounded-full hover:bg-white/90 transition-colors"
+                    disabled={!userId.trim()}
+                    className="absolute right-1.5 bg-white text-gray-900 text-xs sm:text-sm font-medium px-3 sm:px-6 py-2 sm:py-3 rounded-full hover:bg-white/90 transition-colors disabled:opacity-40"
                   >
-                    Try Demo
+                    Get Started
                   </button>
                 </div>
-                <p className="text-white/40 text-xs">
-                  Demo data loads automatically. Connect Fitbit when you&apos;re ready for your real data.
-                </p>
               </div>
             </div>
 
@@ -365,9 +366,10 @@ export default function Landing() {
           <button
             type="button"
             onClick={handleGetStarted}
-            className="text-white/50 hover:text-white text-xs transition-colors"
+            disabled={!userId.trim()}
+            className="text-white/50 hover:text-white text-xs transition-colors disabled:opacity-30"
           >
-            Try the demo →
+            Get started →
           </button>
         </footer>
       </div>

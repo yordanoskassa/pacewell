@@ -57,11 +57,11 @@ export default function Dashboard() {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [symptoms, setSymptoms] = useState<SymptomLog[]>([]);
   const [insight, setInsight] = useState<AIInsight | null>(null);
-  const [demoLoading, setDemoLoading] = useState(false);
   const [insightLoading, setInsightLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const [initMessage, setInitMessage] = useState("Loading your data…");
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -92,29 +92,55 @@ export default function Dashboard() {
   useEffect(() => {
     if (!userId) return;
 
+    async function loadDemoFallback() {
+      const result = await seedDemoData(userId, today);
+      setBaseline(result.baseline_bpm);
+      setIsDemoMode(true);
+      await loadData();
+    }
+
     async function init() {
       setInitializing(true);
       try {
-        const realFitbit = isFitbitConnectedFromUrl();
-        if (realFitbit) {
+        const justConnected = isFitbitConnectedFromUrl();
+        if (justConnected) {
           window.history.replaceState({}, "", window.location.pathname);
         }
 
         const status = await getWearableStatus(userId);
-        const hasData = await loadData();
+        const hasRealConnection = status.connected && !status.is_demo;
 
-        if (realFitbit || (status.connected && !status.is_demo)) {
-          setIsDemoMode(false);
-        } else if (!hasData) {
-          const result = await seedDemoData(userId, today);
-          setBaseline(result.baseline_bpm);
-          setIsDemoMode(true);
-          await loadData();
-        } else if (status.is_demo) {
-          setIsDemoMode(true);
+        if (hasRealConnection || justConnected) {
+          setInitMessage("Syncing your Fitbit…");
+          try {
+            const result = await syncToday(userId);
+            setBaseline(result.baseline_bpm);
+            setIsDemoMode(false);
+            await loadData();
+            return;
+          } catch {
+            const hasData = await loadData();
+            if (hasData) {
+              setIsDemoMode(false);
+              return;
+            }
+          }
+        }
+
+        setInitMessage("Loading preview data…");
+        const hasData = await loadData();
+        if (!hasData) {
+          await loadDemoFallback();
+        } else {
+          setIsDemoMode(status.is_demo);
         }
       } catch {
-        /* backend may be offline */
+        try {
+          setInitMessage("Loading preview data…");
+          await loadDemoFallback();
+        } catch {
+          /* backend offline */
+        }
       } finally {
         setInitializing(false);
       }
@@ -123,17 +149,6 @@ export default function Dashboard() {
     init();
   }, [userId, today, loadData]);
 
-  const handleLoadDemo = async () => {
-    setDemoLoading(true);
-    try {
-      const result = await seedDemoData(userId, today);
-      setBaseline(result.baseline_bpm);
-      setIsDemoMode(true);
-      await loadData();
-    } catch { /* ignore */ }
-    finally { setDemoLoading(false); }
-  };
-
   const handleSync = async () => {
     setSyncLoading(true);
     try {
@@ -141,8 +156,11 @@ export default function Dashboard() {
       setBaseline(result.baseline_bpm);
       setIsDemoMode(false);
       await loadData();
-    } catch { /* ignore */ }
-    finally { setSyncLoading(false); }
+    } catch {
+      /* sync failed — stay on current data */
+    } finally {
+      setSyncLoading(false);
+    }
   };
 
   const handleInsight = async () => {
@@ -193,8 +211,9 @@ export default function Dashboard() {
 
   if (initializing) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] text-white font-inter dark-ui flex items-center justify-center">
+      <div className="min-h-screen bg-[#0a0a0f] text-white font-inter dark-ui flex flex-col items-center justify-center gap-3">
         <Loader2 size={24} className="animate-spin text-white/30" />
+        <p className="text-white/30 text-xs">{initMessage}</p>
       </div>
     );
   }
@@ -202,13 +221,13 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white font-inter dark-ui">
       {isDemoMode && (
-        <div className="bg-violet-500/10 border-b border-violet-500/20 px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-violet-300/80 text-xs">
-            Viewing demo data — sample POTS/dysautonomia patterns. Connect Fitbit for your real heart rate.
+        <div className="bg-white/5 border-b border-white/10 px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-white/50 text-xs">
+            Connect your wearable to see your real heart rate data.
           </p>
           <a
             href={getFitbitAuthUrl(userId)}
-            className="text-xs font-medium text-violet-300 hover:text-white transition-colors"
+            className="text-xs font-medium text-white/70 hover:text-white transition-colors"
           >
             Connect Fitbit →
           </a>
@@ -224,21 +243,12 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           <button
             type="button"
-            onClick={handleLoadDemo}
-            disabled={demoLoading}
-            className="glass text-white text-xs px-4 py-2 rounded-full hover:bg-white/10 transition-colors flex items-center gap-2"
-          >
-            {demoLoading ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-            Reset Demo
-          </button>
-          <button
-            type="button"
             onClick={handleSync}
             disabled={syncLoading}
-            className="glass text-white text-xs px-4 py-2 rounded-full hover:bg-white/10 transition-colors flex items-center gap-2"
+            className="glass text-white text-xs px-4 py-2 rounded-full hover:bg-white/10 transition-colors flex items-center gap-2 disabled:opacity-40"
           >
             {syncLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            Sync Fitbit
+            Sync
           </button>
           <a
             href={getFitbitAuthUrl(userId)}
