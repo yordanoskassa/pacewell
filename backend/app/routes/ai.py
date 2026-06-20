@@ -25,7 +25,10 @@ async def get_insight(
     # Gather data
     hr_doc = await heart_rate_col().find_one({"user_id": user_id, "date": date})
     if not hr_doc or not hr_doc.get("points"):
-        raise HTTPException(status_code=404, detail="No heart rate data for this date. Sync first.")
+        # Auto-seed demo data so the user always gets an analysis
+        from ..routes.demo import seed_demo_data
+        await seed_demo_data(user_id=user_id, date=date)
+        hr_doc = await heart_rate_col().find_one({"user_id": user_id, "date": date})
 
     hr_data = hr_doc["points"]
 

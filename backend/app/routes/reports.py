@@ -23,6 +23,17 @@ async def generate_report(
     start = datetime.strptime(start_date, "%Y-%m-%d")
     end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
 
+    # Auto-seed demo data for the date range if nothing exists
+    hr_check = await heart_rate_col().find_one({
+        "user_id": user_id,
+        "date": {"$gte": start_date, "$lte": end_date},
+    })
+    if not hr_check:
+        from ..routes.demo import seed_demo_data
+        await seed_demo_data(user_id=user_id, date=start_date)
+        if start_date != end_date:
+            await seed_demo_data(user_id=user_id, date=end_date)
+
     # Gather HR data across date range
     hr_cursor = heart_rate_col().find({
         "user_id": user_id,

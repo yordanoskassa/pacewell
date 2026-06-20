@@ -37,6 +37,14 @@ async def _get_hr_for_date(user_id: str, date: str) -> dict:
         {"_id": 0},
     )
     if not doc:
+        # Auto-seed demo data so the user always sees something
+        from ..routes.demo import seed_demo_data
+        await seed_demo_data(user_id=user_id, date=date)
+        doc = await heart_rate_col().find_one(
+            {"user_id": user_id, "date": date},
+            {"_id": 0},
+        )
+    if not doc:
         return {"date": date, "points": [], "synced_at": None}
     doc["synced_at"] = doc.get("synced_at", "").isoformat() if doc.get("synced_at") else None
     return doc
