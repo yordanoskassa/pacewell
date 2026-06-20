@@ -13,6 +13,7 @@ import {
   getHREventsToday,
   getActivities,
   getSymptoms,
+  seedDemoData,
 } from "../api/client";
 import type { HRPoint, HREvent, ActivityLog, SymptomLog, SyncResult } from "../types";
 
@@ -24,6 +25,7 @@ export default function Dashboard() {
   const [events, setEvents] = useState<HREvent[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [symptoms, setSymptoms] = useState<SymptomLog[]>([]);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -68,15 +70,46 @@ export default function Dashboard() {
     loadData();
   };
 
+  const handleLoadDemo = async () => {
+    if (!userId) return;
+    setDemoLoading(true);
+    try {
+      const result = await seedDemoData(userId, today);
+      setBaseline(result.baseline_bpm);
+      setFitbitConnected(true);
+      await loadData();
+    } catch {
+      // ignore
+    } finally {
+      setDemoLoading(false);
+    }
+  };
+
   if (!userId) {
     return null; // BlockedState handles this in App.tsx
   }
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "1.5rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#1a1a2e" }}>PaceWell</h1>
-        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            onClick={handleLoadDemo}
+            disabled={demoLoading}
+            style={{
+              padding: "0.6rem 1.2rem",
+              background: demoLoading ? "#aaa" : "#43a047",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              fontWeight: 600,
+              fontSize: "0.9rem",
+              cursor: demoLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            {demoLoading ? "Loading..." : "Load Demo Data"}
+          </button>
           <ConnectFitbit
             connected={fitbitConnected}
             authUrl={getFitbitAuthUrl(userId)}

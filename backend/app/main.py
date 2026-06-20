@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import connect_db, close_db
-from .routes import auth, fitbit, heart_rate, activities, symptoms, ai, reports
+from .routes import auth, fitbit, heart_rate, activities, symptoms, ai, reports, demo
 
 
 @asynccontextmanager
@@ -35,6 +35,7 @@ app.include_router(activities.router)
 app.include_router(symptoms.router)
 app.include_router(ai.router)
 app.include_router(reports.router)
+app.include_router(demo.router)
 
 
 @app.get("/")

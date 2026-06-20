@@ -147,4 +147,11 @@ export async function getReport(userId: string, reportId: string) {
   return resp.data;
 }
 
+// Demo
+export async function seedDemoData(userId: string, date?: string) {
+  const dateParam = date ? `&date=${date}` : "";
+  const resp = await api.post(`/demo/seed?user_id=${userId}${dateParam}`);
+  return resp.data;
+}
+
 export default api;
