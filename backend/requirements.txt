@@ -1,9 +1,8 @@
 fastapi
 uvicorn[standard]
-motor
-pymongo
 pydantic
 pydantic-settings
+email-validator
 httpx
 cryptography
 google-generativeai

@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Query, HTTPException
 from datetime import datetime
-from bson import ObjectId
 from ..database import symptom_logs_col
 from ..models.symptom import SymptomLogCreate
 
@@ -54,7 +53,7 @@ async def list_symptoms(
 async def delete_symptom(symptom_id: str, user_id: str = Query(...)):
     """Delete a symptom log."""
     result = await symptom_logs_col().delete_one({
-        "_id": ObjectId(symptom_id),
+        "_id": symptom_id,
         "user_id": user_id,
     })
     if result.deleted_count == 0:

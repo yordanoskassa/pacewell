@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Query, HTTPException
 from datetime import datetime
-from bson import ObjectId
 from ..database import (
     heart_rate_col,
     hr_events_col,
@@ -143,7 +142,7 @@ async def list_reports(user_id: str = Query(...)):
 async def get_report(report_id: str, user_id: str = Query(...)):
     """Get a specific report."""
     doc = await reports_col().find_one({
-        "_id": ObjectId(report_id),
+        "_id": report_id,
         "user_id": user_id,
     })
     if not doc:

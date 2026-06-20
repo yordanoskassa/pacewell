@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Query, HTTPException
 from datetime import datetime
-from bson import ObjectId
 from ..database import activity_logs_col
 from ..models.activity import ActivityLogCreate
 
@@ -54,7 +53,7 @@ async def list_activities(
 async def delete_activity(activity_id: str, user_id: str = Query(...)):
     """Delete an activity log."""
     result = await activity_logs_col().delete_one({
-        "_id": ObjectId(activity_id),
+        "_id": activity_id,
         "user_id": user_id,
     })
     if result.deleted_count == 0:

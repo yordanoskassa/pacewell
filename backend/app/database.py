@@ -1,20 +1,14 @@
-from motor.motor_asyncio import AsyncIOMotorClient
-from .config import settings
-
-client: AsyncIOMotorClient = None
-db = None
+from .memory_store import db
 
 
 async def connect_db():
-    global client, db
-    client = AsyncIOMotorClient(settings.mongodb_uri)
-    db = client[settings.db_name]
+    """No-op — data lives in process memory."""
+    pass
 
 
 async def close_db():
-    global client
-    if client:
-        client.close()
+    """No-op."""
+    pass
 
 
 def get_db():
@@ -51,3 +45,7 @@ def ai_insights_col():
 
 def reports_col():
     return db["reports"]
+
+
+def waitlist_col():
+    return db["waitlist_entries"]

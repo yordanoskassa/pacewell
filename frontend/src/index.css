@@ -29,7 +29,6 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Native form controls on dark pages */
   .dark-ui {
     color-scheme: dark;
   }
