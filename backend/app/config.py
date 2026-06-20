@@ -4,9 +4,9 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     mongodb_uri: str = "mongodb://localhost:27017"
     db_name: str = "pacewell"
-    fitbit_client_id: str = ""
-    fitbit_client_secret: str = ""
-    fitbit_redirect_uri: str = "http://localhost:8000/auth/fitbit/callback"
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/auth/fitbit/callback"
     fernet_key: str = ""
     gemini_api_key: str = ""
     frontend_url: str = "http://localhost:5173"

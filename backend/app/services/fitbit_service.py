@@ -1,37 +1,48 @@
 import httpx
 from datetime import datetime, timedelta
+from urllib.parse import urlencode
 from ..config import settings
 from ..encryption import encrypt_token, decrypt_token
 from ..database import wearable_connections_col
 
-FITBIT_AUTH_URL = "https://www.fitbit.com/oauth2/authorize"
-FITBIT_TOKEN_URL = "https://api.fitbit.com/oauth2/token"
-FITBIT_API_BASE = "https://api.fitbit.com"
+# Google OAuth endpoints (Fitbit migrated to Google)
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+
+# Google Health API (replaces legacy api.fitbit.com)
+HEALTH_API_BASE = "https://health.googleapis.com"
+
+# Single unified scope for fitness/health data
+GOOGLE_HEALTH_SCOPE = "https://www.googleapis.com/auth/googlehealth.activity_and_fitness"
 
 
-def get_auth_url() -> str:
+def get_auth_url(state: str = "") -> str:
+    """Build Google OAuth2 authorization URL for health data access."""
     params = {
+        "client_id": settings.google_client_id,
+        "redirect_uri": settings.google_redirect_uri,
         "response_type": "code",
-        "client_id": settings.fitbit_client_id,
-        "redirect_uri": settings.fitbit_redirect_uri,
-        "scope": "heartrate activity profile",
-        "expires_in": "604800",
+        "scope": GOOGLE_HEALTH_SCOPE,
+        "access_type": "offline",
+        "prompt": "consent",
     }
-    query = "&".join(f"{k}={v}" for k, v in params.items())
-    return f"{FITBIT_AUTH_URL}?{query}"
+    if state:
+        params["state"] = state
+    return f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
 
 
 async def exchange_code(code: str) -> dict:
+    """Exchange authorization code for access/refresh tokens via Google OAuth."""
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            FITBIT_TOKEN_URL,
+            GOOGLE_TOKEN_URL,
             data={
-                "client_id": settings.fitbit_client_id,
-                "grant_type": "authorization_code",
-                "redirect_uri": settings.fitbit_redirect_uri,
+                "client_id": settings.google_client_id,
+                "client_secret": settings.google_client_secret,
                 "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": settings.google_redirect_uri,
             },
-            auth=(settings.fitbit_client_id, settings.fitbit_client_secret),
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         resp.raise_for_status()
@@ -39,6 +50,7 @@ async def exchange_code(code: str) -> dict:
 
 
 async def refresh_access_token(user_id: str) -> str:
+    """Refresh the Google OAuth access token."""
     conn = await wearable_connections_col().find_one({"user_id": user_id})
     if not conn:
         raise ValueError("No wearable connection found")
@@ -47,33 +59,37 @@ async def refresh_access_token(user_id: str) -> str:
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            FITBIT_TOKEN_URL,
+            GOOGLE_TOKEN_URL,
             data={
-                "grant_type": "refresh_token",
+                "client_id": settings.google_client_id,
+                "client_secret": settings.google_client_secret,
                 "refresh_token": refresh_token,
-                "client_id": settings.fitbit_client_id,
+                "grant_type": "refresh_token",
             },
-            auth=(settings.fitbit_client_id, settings.fitbit_client_secret),
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         resp.raise_for_status()
         token_data = resp.json()
 
-    expires_at = datetime.utcnow() + timedelta(seconds=token_data["expires_in"])
+    expires_at = datetime.utcnow() + timedelta(seconds=token_data.get("expires_in", 3600))
+
+    update_fields = {
+        "access_token_encrypted": encrypt_token(token_data["access_token"]),
+        "expires_at": expires_at,
+    }
+    # Google may or may not return a new refresh token
+    if "refresh_token" in token_data:
+        update_fields["refresh_token_encrypted"] = encrypt_token(token_data["refresh_token"])
+
     await wearable_connections_col().update_one(
         {"user_id": user_id},
-        {
-            "$set": {
-                "access_token_encrypted": encrypt_token(token_data["access_token"]),
-                "refresh_token_encrypted": encrypt_token(token_data["refresh_token"]),
-                "expires_at": expires_at,
-            }
-        },
+        {"$set": update_fields},
     )
     return token_data["access_token"]
 
 
 async def get_valid_token(user_id: str) -> str:
+    """Get a valid access token, refreshing if expired."""
     conn = await wearable_connections_col().find_one({"user_id": user_id})
     if not conn:
         raise ValueError("No wearable connection found")
@@ -85,34 +101,67 @@ async def get_valid_token(user_id: str) -> str:
 
 
 async def fetch_heart_rate(user_id: str, date: str) -> list[dict]:
-    """Fetch intraday heart rate data from Fitbit for a given date (YYYY-MM-DD)."""
+    """Fetch heart rate data from Google Health API for a given date (YYYY-MM-DD)."""
     token = await get_valid_token(user_id)
-    url = f"{FITBIT_API_BASE}/1/user/-/activities/heart/date/{date}/1d/1min.json"
+
+    # Query heart rate data points for the date
+    start_dt = datetime.strptime(date, "%Y-%m-%d")
+    end_dt = start_dt + timedelta(days=1)
+
+    # RFC3339 timestamps
+    start_time = start_dt.strftime("%Y-%m-%dT00:00:00Z")
+    end_time = end_dt.strftime("%Y-%m-%dT00:00:00Z")
+
+    url = f"{HEALTH_API_BASE}/v4/users/me/dataTypes/heart_rate/dataPoints"
+    params = {
+        "filter.startTime": start_time,
+        "filter.endTime": end_time,
+        "pageSize": 2000,
+    }
+
+    all_points = []
 
     async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            url,
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        if resp.status_code == 401:
-            token = await refresh_access_token(user_id)
+        while True:
             resp = await client.get(
                 url,
+                params=params,
                 headers={"Authorization": f"Bearer {token}"},
             )
 
-        resp.raise_for_status()
-        data = resp.json()
+            if resp.status_code == 401:
+                token = await refresh_access_token(user_id)
+                resp = await client.get(
+                    url,
+                    params=params,
+                    headers={"Authorization": f"Bearer {token}"},
+                )
 
-    dataset = (
-        data.get("activities-heart-intraday", {}).get("dataset", [])
-    )
+            resp.raise_for_status()
+            data = resp.json()
 
-    points = []
-    for entry in dataset:
-        time_str = entry["time"]
-        dt = datetime.strptime(f"{date} {time_str}", "%Y-%m-%d %H:%M:%S")
-        points.append({"timestamp": dt.isoformat(), "bpm": entry["value"]})
+            for dp in data.get("dataPoints", []):
+                ts = dp.get("startTime") or dp.get("time")
+                bpm = None
+                # Extract BPM from typed values
+                for val in dp.get("typedValues", []):
+                    if "intVal" in val:
+                        bpm = val["intVal"]
+                    elif "fpVal" in val:
+                        bpm = int(val["fpVal"])
+                if ts and bpm:
+                    all_points.append({
+                        "timestamp": ts,
+                        "bpm": bpm,
+                    })
 
-    return points
+            # Handle pagination
+            next_token = data.get("nextPageToken")
+            if next_token:
+                params["pageToken"] = next_token
+            else:
+                break
+
+    # Sort by timestamp
+    all_points.sort(key=lambda p: p["timestamp"])
+    return all_points
