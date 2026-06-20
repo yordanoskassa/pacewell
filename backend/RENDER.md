@@ -21,9 +21,16 @@ Save output as `FERNET_KEY`.
 **Option B — Manual**
 
 1. **New** → **Web Service** → connect repo
-2. Root Directory: `backend`
+2. Leave **Root Directory** empty (repo root is fine now)
 3. Build: `pip install -r requirements.txt`
-4. Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+4. Start: `bash start.sh`
+5. Environment: `PYTHON_VERSION=3.11.9`
+
+**Option C — Manual with backend root**
+
+1. Root Directory: `backend`
+2. Build: `pip install -r requirements.txt`
+3. Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
 ## 3. Environment variables
 
